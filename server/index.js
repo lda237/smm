@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: 'https://smm.mediasystem.cm', // Replace with your frontend domain
+  origin: ['https://your-frontend-domain.com', 'http://localhost:5173'], // Autorise plusieurs origines
   methods: ['GET', 'POST'],
   credentials: true,
 }));
