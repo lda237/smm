@@ -3,18 +3,27 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'https://smm.mediasystem.cm', // Replace with your frontend domain
+  methods: ['GET', 'POST'],
+  credentials: true,
+}));
 app.use(express.json());
 
 // Routes for Facebook Graph API
 app.get('/api/pages', async (req, res) => {
   try {
+    if (!process.env.VITE_FACEBOOK_PAGE_TOKEN) {
+      return res.status(400).json({ error: 'Facebook Page Token is missing' });
+    }
+
     const response = await axios.get(
       `https://graph.facebook.com/v22.0/me/accounts`,
       {
@@ -39,6 +48,10 @@ app.get('/api/facebook/insights/:pageId', async (req, res) => {
     }
 
     const { access_token } = req.query;
+    if (!access_token) {
+      return res.status(400).json({ error: 'Access token is required' });
+    }
+
     const [followers, insights] = await Promise.all([
       axios.get(`https://graph.facebook.com/v22.0/${pageId}`, {
         params: {
@@ -54,6 +67,7 @@ app.get('/api/facebook/insights/:pageId', async (req, res) => {
         }
       })
     ]);
+
     res.json({
       followers: followers.data.followers_count || 0,
       engagement: insights.data.data.find(d => d.name === 'page_engaged_users')?.values[0]?.value || 0,
@@ -72,7 +86,12 @@ app.get('/api/facebook/posts/:pageId', async (req, res) => {
     if (!/^\d+$/.test(pageId)) {
       return res.status(400).json({ error: 'Invalid page ID' });
     }
+
     const { access_token } = req.query;
+    if (!access_token) {
+      return res.status(400).json({ error: 'Access token is required' });
+    }
+
     const response = await axios.get(
       `https://graph.facebook.com/v22.0/${pageId}/posts`,
       {
@@ -82,14 +101,16 @@ app.get('/api/facebook/posts/:pageId', async (req, res) => {
         }
       }
     );
+
     const posts = response.data.data.map(post => ({
       id: post.id,
-      message: post.message,
+      message: post.message || 'No message',
       created_time: post.created_time,
       likes: post.likes?.summary?.total_count || 0,
       comments: post.comments?.summary?.total_count || 0,
       shares: post.shares?.count || 0
     }));
+
     res.json(posts);
   } catch (error) {
     console.error('Error fetching Facebook posts:', error.response?.data || error.message);
@@ -101,6 +122,10 @@ app.get('/api/instagram/insights/:igAccountId', async (req, res) => {
   try {
     const { igAccountId } = req.params;
     const { access_token } = req.query;
+    if (!access_token) {
+      return res.status(400).json({ error: 'Access token is required' });
+    }
+
     const [followers, insights] = await Promise.all([
       axios.get(`https://graph.facebook.com/v22.0/${igAccountId}`, {
         params: {
@@ -116,6 +141,7 @@ app.get('/api/instagram/insights/:igAccountId', async (req, res) => {
         }
       })
     ]);
+
     res.json({
       followers: followers.data.followers_count || 0,
       engagement: insights.data.data.find(d => d.name === 'profile_views')?.values[0]?.value || 0,
@@ -128,10 +154,14 @@ app.get('/api/instagram/insights/:igAccountId', async (req, res) => {
   }
 });
 
-aapp.get('/api/instagram/posts/:igAccountId', async (req, res) => {
+app.get('/api/instagram/posts/:igAccountId', async (req, res) => {
   try {
     const { igAccountId } = req.params;
     const { access_token } = req.query;
+    if (!access_token) {
+      return res.status(400).json({ error: 'Access token is required' });
+    }
+
     const response = await axios.get(
       `https://graph.facebook.com/v22.0/${igAccountId}/media`,
       {
@@ -141,14 +171,16 @@ aapp.get('/api/instagram/posts/:igAccountId', async (req, res) => {
         }
       }
     );
+
     const posts = response.data.data.map(post => ({
       id: post.id,
-      message: post.caption,
+      message: post.caption || 'No caption',
       created_time: post.timestamp,
       likes: post.like_count,
       comments: post.comments_count,
       media_url: post.media_url
     }));
+
     res.json(posts);
   } catch (error) {
     console.error('Error fetching Instagram posts:', error.response?.data || error.message);
@@ -156,6 +188,7 @@ aapp.get('/api/instagram/posts/:igAccountId', async (req, res) => {
   }
 });
 
+// Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
